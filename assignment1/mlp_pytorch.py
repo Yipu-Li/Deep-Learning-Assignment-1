@@ -59,6 +59,28 @@ class MLP(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+        super(MLP, self).__init__()
+
+        ## The Hidden Layers
+        self.LinearModules = nn.ModuleList(None)
+        self.ELUModules = nn.ModuleList(None)
+        self.hidden = n_hidden
+        n_layer_feaure = [3072] + n_hidden 
+        for i in range(len(n_hidden)):
+            self.LinearModules.append(nn.Linear(n_layer_feaure[i], n_layer_feaure[i+1]))
+            self.ELUModules.append(nn.ELU())
+
+        ## The out-put Layer
+        self.transformer = nn.Linear(n_hidden[-1], n_classes)
+        self.Softmax = nn.Softmax()
+
+        ## Batch Normalization Layer
+        self.BatchNorm = []
+        if use_batch_norm == True:
+            for i in range(len(n_hidden)):
+              self.BatchNorm.append(nn.BatchNorm1d(n_layer_feaure[i]))
+
+
         pass
         #######################
         # END OF YOUR CODE    #
@@ -81,6 +103,16 @@ class MLP(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+
+        ## Forward in Hidden Layers
+        for i in range(len(self.hidden)):
+            if len(self.BatchNorm) > 0:
+                x = self.BatchNorm[i](x)
+            x = self.ELUModules[i](self.LinearModules[i](x))
+
+        ## Forward in output Layers
+        x = self.Softmax(self.transformer(x))
+        out = x
 
         #######################
         # END OF YOUR CODE    #

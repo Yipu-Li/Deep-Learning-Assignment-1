@@ -44,12 +44,25 @@ class LinearModule(object):
 
         # Note: For the sake of this assignment, please store the parameters
         # and gradients in this format, otherwise some unit tests might fail.
+
         self.params = {'weight': None, 'bias': None} # Model parameters
         self.grads = {'weight': None, 'bias': None} # Gradients
 
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+
+        scale = 2 / in_features
+
+        self.params['weight'] = np.random.normal(loc = 0.0, scale = scale,size = (out_features, in_features))
+
+        self.params['bias'] = 0
+
+        self.grads['weight'] = 0
+
+        self.grads['bias'] = 0
+
+        self.input_layer = input_layer
 
         #######################
         # END OF YOUR CODE    #
@@ -73,6 +86,14 @@ class LinearModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+
+        if self.input_layer == False:
+            out = x @ self.params['weight'].T + self.params['bias']
+
+            self.data = x
+        
+        else:
+            out = x
 
         #######################
         # END OF YOUR CODE    #
@@ -98,6 +119,18 @@ class LinearModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
+        if self.input_layer == False:
+            x = self.data
+
+            dx = dout @ self.params['weight']
+
+            self.grads['weight'] = dout.T @ x
+
+            self.grads['bias'] = np.ones(np.shape(dout)[0]) @ dout
+        
+        else:
+            dx = 0
+ 
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -114,6 +147,8 @@ class LinearModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+
+        self.data = None
         pass
         #######################
         # END OF YOUR CODE    #
@@ -147,6 +182,10 @@ class ELUModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
+        self.data = x
+
+        out = np.where(x <= 0, self.alpha * (np.exp(x) - 1.0), x)
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -169,6 +208,12 @@ class ELUModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
+        act_derivative = self.data
+
+        act_derivative = np.where(self.data <= 0, self.alpha * np.exp(self.data), np.ones((np.shape(self.data))))
+
+        dx = dout * act_derivative
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -185,6 +230,7 @@ class ELUModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+        self.data = None
         pass
         #######################
         # END OF YOUR CODE    #
@@ -215,6 +261,14 @@ class SoftMaxModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
+        max_data = np.max(x, axis = 1)
+
+        divider = np.sum(np.exp(x - max_data[:,np.newaxis]), axis = 1)
+
+        out = np.exp(x - max_data[:,np.newaxis]) / divider[:,np.newaxis]
+
+        self.out = out
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -237,6 +291,13 @@ class SoftMaxModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
+        y = self.out
+
+        dimension = np.shape(y)[1]
+
+        dx = y * (dout - (dout * y) @ np.ones((dimension, dimension)))
+
+        
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -254,7 +315,9 @@ class SoftMaxModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+
+        self.out = None
+        
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -282,6 +345,10 @@ class CrossEntropyModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
+        y_onehot = (y[:,np.newaxis] == np.arange(np.shape(x)[1]))
+
+        out = np.trace(- np.log(x) @ y_onehot.T) / np.shape(x)[0]
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -304,6 +371,10 @@ class CrossEntropyModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+
+        y_onehot = (y[:,np.newaxis] == np.arange(np.shape(x)[1]))
+
+        dx = - (y_onehot / (x * np.shape(x)[0]))
 
         #######################
         # END OF YOUR CODE    #

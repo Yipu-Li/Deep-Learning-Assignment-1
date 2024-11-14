@@ -56,6 +56,11 @@ def accuracy(predictions, targets):
     # PUT YOUR CODE HERE  #
     #######################
 
+    inflexible_prediction = torch.argmax(predictions, dim = 1)
+    print(targets, inflexible_prediction)
+    #target_vector = torch.argmax(targets, dim = 1)
+    accuracy = (torch.sum(inflexible_prediction == targets)) / len(targets)
+
     #######################
     # END OF YOUR CODE    #
     #######################
@@ -83,6 +88,16 @@ def evaluate_model(model, data_loader):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
+    data_size = 0
+    sum_accuracy = 0
+
+    for batch in data_loader:
+      batch_reshape = batch[0].view(batch[0].shape[0], 3072)
+      flexible_prediction = model.forward(batch_reshape)
+      sum_accuracy += batch[0].shape[0] * accuracy(flexible_prediction, batch[1])
+      data_size += batch[0].shape[0]
+
+    avg_accuracy = sum_accuracy / data_size
 
     #######################
     # END OF YOUR CODE    #
@@ -144,17 +159,49 @@ def train(hidden_dims, lr, use_batch_norm, batch_size, epochs, seed, data_dir):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
+    train = cifar10_loader["train"] 
+    valid = cifar10_loader["validation"]
+    test = cifar10_loader["test"]
+    ## Load the data, these are all iterables.
 
     # TODO: Initialize model and loss module
-    model = ...
-    loss_module = ...
+    model = MLP(batch_size, hidden_dims, 10, use_batch_norm)
+    best_model, best_val_accu = model, 0
+    loss_module = nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(model.parameters(), lr)
     # TODO: Training loop including validation
     # TODO: Do optimization with the simple SGD optimizer
-    val_accuracies = ...
+    val_accuracies = []
+    loss_epoch = np.arange(epochs)
+    for i in range(epochs):
+      loss_epoch[i] = 0
+      for batch in train:
+          batch_reshape = batch[0].view(128, 3072)
+          x = model.forward(batch_reshape)
+          loss = loss_module(x, batch[1])
+          loss_without_grad = loss.detach()
+          loss_epoch[i] += loss_without_grad
+          ## Forwarding
+          ## Here I let the loss of an epoch be the sum of all the loss of the each batch. But actually I'm not sure whether this makes sense since the model is still being updated.
+
+          optimizer.zero_grad()
+          loss.backward()
+          optimizer.step()
+          ## Backwarding and Optimizing
+
+      
+
+      accu = evaluate_model(model, valid)
+      if accu > best_val_accu:
+          best_model = deepcopy(model)
+          best_val_accu = accu
+
+      val_accuracies.append(accu)
+
     # TODO: Test best model
-    test_accuracy = ...
+    test_accuracy = evaluate_model(best_model, test)
     # TODO: Add any information you might want to save for plotting
-    logging_dict = ...
+    logging_dict = loss_epoch
     #######################
     # END OF YOUR CODE    #
     #######################
@@ -169,7 +216,7 @@ if __name__ == '__main__':
     # Model hyperparameters
     parser.add_argument('--hidden_dims', default=[128], type=int, nargs='+',
                         help='Hidden dimensionalities to use inside the network. To specify multiple, use " " to separate them. Example: "256 128"')
-    parser.add_argument('--use_batch_norm', action='store_true',
+    parser.add_argument('--use_batch_norm', default = False, action='store_true',
                         help='Use this option to add Batch Normalization layers to the MLP.')
 
     # Optimizer hyperparameters
@@ -189,5 +236,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
     kwargs = vars(args)
 
-    train(**kwargs)
+    model, val_accuracies, test_accuracy, logging_dict = train(**kwargs)
     # Feel free to add any additional functions, such as plotting of the loss curve here
+
+    #### I plot here
+
+    import matplotlib.pyplot as plt
+    plt.subplot(1,2,1)
+    plt.plot(np.arange(len(val_accuracies)),val_accuracies, label = "validation accuracy")
+    plt.legend()
+    plt.subplot(1,2,2)
+    plt.plot(np.arange(len(logging_dict)),logging_dict, label = "loss")
+    plt.legend()
+    plt.show()
+    print(test_accuracy)

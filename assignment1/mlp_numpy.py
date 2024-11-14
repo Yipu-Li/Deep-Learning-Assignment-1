@@ -21,7 +21,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from modules import *
+from modules import LinearModule, SoftMaxModule, CrossEntropyModule, ELUModule
 
 
 class MLP(object):
@@ -52,7 +52,25 @@ class MLP(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+        alpha = 1
+
+        ## The input layers
+
+        self.inputlayer = LinearModule(n_inputs, 3072, True)
+        self.inputELU = ELUModule(alpha)
+
+        ## The hidden layers
+
+        n_layers = [3072] + n_hidden
+        self.layer = n_layers
+        self.LinearModules = [LinearModule(n_layers[i], n_layers[i + 1], False) for i in range(len(n_layers) - 1)]
+        self.ELUModules = [ELUModule(alpha) for i in range(len(n_layers) - 1)]
+
+        ## The final output layer
+
+        self.transformerlayer = LinearModule(n_hidden[-1], n_classes, False)
+        self.SoftMaxModules = SoftMaxModule()
+        self.CrossEntropyModules = CrossEntropyModule()
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -74,6 +92,15 @@ class MLP(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+        x = self.inputlayer.forward(x)
+        ## Question: Do I need a ELU layer here
+
+
+        for h in range(len(self.LinearModules)):
+            x = self.ELUModules[h].forward(self.LinearModules[h].forward(x))
+
+
+        out = self.SoftMaxModules.forward(self.transformerlayer.forward(x))
 
         #######################
         # END OF YOUR CODE    #
@@ -95,7 +122,14 @@ class MLP(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+
+        dx = self.transformerlayer.backward(self.SoftMaxModules.backward(dout))
+
+        n_hidden = len(self.LinearModules)
+
+        for h in range(n_hidden):
+            dx = self.LinearModules[n_hidden - h - 1].backward(self.ELUModules[n_hidden - h - 1].backward(dx))
+        
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -112,6 +146,13 @@ class MLP(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+        #self.inputlayer.clear_cache()
+        for h in range(len(self.LinearModules)):
+            self.LinearModules[h].clear_cache()
+            self.ELUModules[h].clear_cache()
+        self.transformerlayer.clear_cache()
+        self.SoftMaxModules.clear_cache()
+
         pass
         #######################
         # END OF YOUR CODE    #

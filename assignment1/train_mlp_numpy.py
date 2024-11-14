@@ -53,6 +53,8 @@ def accuracy(predictions, targets):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
+    inflexible_prediction = np.argmax(predictions, axis = 1)
+    accuracy = (np.sum(inflexible_prediction == targets)) / len(targets)
 
     #######################
     # END OF YOUR CODE    #
@@ -81,7 +83,21 @@ def evaluate_model(model, data_loader):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
+    data_size = 0
+    sum_accuracy = 0
 
+    for batch in data_loader:
+      batch_reshape = np.reshape(batch[0], (np.shape(batch[0])[0], 3072))
+
+      flexible_prediction = model.forward(batch_reshape)
+
+
+      sum_accuracy += np.shape(batch[0])[0] * accuracy(flexible_prediction, batch[1])
+      data_size += np.shape(batch[0])[0]
+
+    ## I bet I can optimize the code here.
+
+    avg_accuracy = sum_accuracy / data_size
     #######################
     # END OF YOUR CODE    #
     #######################
@@ -133,16 +149,52 @@ def train(hidden_dims, lr, batch_size, epochs, seed, data_dir):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
+    train = cifar10_loader["train"] 
+    valid = cifar10_loader["validation"]
+    test = cifar10_loader["test"]
+    ## Load the data, these are all iterables.
 
     # TODO: Initialize model and loss module
-    model = ...
-    loss_module = ...
+    
+    model = MLP(batch_size, hidden_dims, 10)
+    best_model, best_val_accu = model, 0
+    loss_list = []
+    loss_module = CrossEntropyModule()
+
     # TODO: Training loop including validation
-    val_accuracies = ...
+    val_accuracies = []
+    for epoch in range(epochs):
+        loss = 0
+        for batch in train: 
+          batch_reshape = np.reshape(batch[0], (128, 3072))
+          output = model.forward(batch_reshape)
+          loss += loss_module.forward(output, batch[1])
+          ## Forward
+
+          dloss = loss_module.backward(output, batch[1])
+          model.backward(dloss)
+          ## Backward
+
+          for j in range(len(model.LinearModules)):
+            model.LinearModules[j].params['weight'] = model.LinearModules[j].params['weight'] - lr * model.LinearModules[j].grads['weight']
+            model.LinearModules[j].params['bias'] = model.LinearModules[j].params['bias'] - lr * model.LinearModules[j].grads['bias']
+          ## gradiant descent
+
+          model.clear_cache()
+        loss_list.append(loss)
+
+        accu = evaluate_model(model, valid)
+
+        if accu > best_val_accu:
+          best_model = deepcopy(model)
+          best_val_accu = accu
+        val_accuracies.append(accu)
+          
     # TODO: Test best model
-    test_accuracy = ...
+    test_accuracy = evaluate_model(best_model, test)
+    model = best_model
     # TODO: Add any information you might want to save for plotting
-    logging_dict = ...
+    logging_dict = loss_list
     #######################
     # END OF YOUR CODE    #
     #######################
@@ -175,5 +227,19 @@ if __name__ == '__main__':
     args = parser.parse_args()
     kwargs = vars(args)
 
-    train(**kwargs)
+    best_model, val_accuracies, test_accuracy, logging_dict = train(**kwargs)
     # Feel free to add any additional functions, such as plotting of the loss curve here
+
+    #### I plot here
+
+    import matplotlib.pyplot as plt
+    plt.subplot(1,2,1)
+    plt.plot(np.arange(len(val_accuracies)),val_accuracies, label = "validation accuracies")
+    plt.legend()
+
+    plt.subplot(1,2,2)
+    plt.plot(np.arange(len(logging_dict)),logging_dict, label = "Loss")
+    plt.legend()
+    plt.show()
+    print(test_accuracy)
+
